@@ -53,6 +53,10 @@ class Settings(BaseModel):
     message_source_path: Path = PROJECT_ROOT / "data" / "mock_messages.jsonl"
     poll_interval_seconds: int = 60
     hourly_summary_interval_seconds: int = 3600
+    qq_allowed_groups: str = ""
+    qq_group_filter_mode: str = "exact"
+    qq_notification_app_names: str = "QQ,linuxqq,com.tencent.qq,com.tencent.mobileqq"
+    qq_capture_private_chats: bool = False
 
     alert_channels: str = "console"
     keyword_rules_path: Path = PROJECT_ROOT / "data" / "keyword_rules.json"
@@ -76,6 +80,14 @@ class Settings(BaseModel):
     def alert_channel_list(self) -> list[str]:
         return [item.strip() for item in self.alert_channels.split(",") if item.strip()]
 
+    @property
+    def qq_allowed_group_list(self) -> list[str]:
+        return [item.strip() for item in self.qq_allowed_groups.split(",") if item.strip()]
+
+    @property
+    def qq_notification_app_name_list(self) -> list[str]:
+        return [item.strip() for item in self.qq_notification_app_names.split(",") if item.strip()]
+
 
 def _build_settings_payload() -> dict[str, Any]:
     dotenv_values = _load_dotenv(PROJECT_ROOT / ".env")
@@ -94,6 +106,16 @@ def _build_settings_payload() -> dict[str, Any]:
         "poll_interval_seconds": int(merged.get("POLL_INTERVAL_SECONDS", "60")),
         "hourly_summary_interval_seconds": int(
             merged.get("HOURLY_SUMMARY_INTERVAL_SECONDS", "3600")
+        ),
+        "qq_allowed_groups": merged.get("QQ_ALLOWED_GROUPS", ""),
+        "qq_group_filter_mode": merged.get("QQ_GROUP_FILTER_MODE", "exact"),
+        "qq_notification_app_names": merged.get(
+            "QQ_NOTIFICATION_APP_NAMES",
+            "QQ,linuxqq,com.tencent.qq,com.tencent.mobileqq",
+        ),
+        "qq_capture_private_chats": _parse_bool(
+            merged.get("QQ_CAPTURE_PRIVATE_CHATS"),
+            False,
         ),
         "alert_channels": merged.get("ALERT_CHANNELS", "console"),
         "keyword_rules_path": _resolve_path(

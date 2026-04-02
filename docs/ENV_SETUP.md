@@ -88,6 +88,30 @@ python scripts/run_demo.py
 - 提醒生成
 - 小时摘要生成
 
+## 6.1 启用真实 QQ collector
+
+如果你要监听本机已登录的 QQ 群消息，请先确认：
+
+- QQ 已登录
+- Linux 桌面通知正常
+- QQ 对目标群会弹出系统通知
+
+然后在 `.env` 里配置：
+
+```bash
+MESSAGE_SOURCE=qq_notification
+QQ_ALLOWED_GROUPS=清华软院预推免群,北大信息学院套磁群
+QQ_GROUP_FILTER_MODE=exact
+```
+
+如果你想先看 collector 能否抓到 QQ 通知，可以运行：
+
+```bash
+python scripts/debug_qq_notifications.py
+```
+
+这个脚本会持续打印被解析出的群名、发送人和文本内容。
+
 ## 7. 启动 API
 
 ```bash

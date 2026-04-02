@@ -10,6 +10,7 @@ from app.api.routes_messages import router as messages_router
 from app.api.routes_reports import router as reports_router
 from app.collector.file_replay_collector import FileReplayCollector
 from app.collector.mock_collector import MockCollector
+from app.collector.qq_notification_collector import QQNotificationCollector
 from app.config import get_settings
 from app.llm.client import OpenAICompatClient
 from app.pipeline.alerting import AlertManager
@@ -37,6 +38,14 @@ def build_collector(source: str, source_path: str):
         return FileReplayCollector(source_path)
     if source == "mock":
         return MockCollector([])
+    if source == "qq_notification":
+        settings = get_settings()
+        return QQNotificationCollector(
+            allowed_groups=settings.qq_allowed_group_list,
+            group_filter_mode=settings.qq_group_filter_mode,
+            app_names=settings.qq_notification_app_name_list,
+            capture_private_chats=settings.qq_capture_private_chats,
+        )
     return None
 
 
@@ -109,6 +118,9 @@ async def lifespan(app: FastAPI):
     if settings.enable_scheduler:
         scheduler.shutdown()
 
+    if collector is not None:
+        await collector.close()
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Summary Bot", lifespan=lifespan)
@@ -119,4 +131,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

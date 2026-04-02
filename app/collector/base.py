@@ -10,3 +10,5 @@ class BaseCollector(ABC):
     async def poll(self) -> list[RawQQMessage]:
         """Return newly observed raw messages."""
 
+    async def close(self) -> None:
+        """Release collector resources if needed."""

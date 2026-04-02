@@ -12,6 +12,7 @@
 - SQLite 持久化消息、分析、提醒、摘要
 - FastAPI 接口查看消息和报告
 - Mock / 文件回放 collector，便于本地开发
+- 基于 Linux 桌面通知的真实 QQ collector，可按群名白名单采集
 
 ## 目录
 
@@ -96,13 +97,39 @@ uvicorn app.main:app --reload
 
 ## 真实 QQ 接入建议
 
-当前项目没有直接实现真实 QQ 消息抓取，而是保留了 `BaseCollector` 接口。后续你可以增加：
+当前项目已经提供一个真实 collector：
 
-- `NotificationCollector`
-- `DesktopAutomationCollector`
-- `QQClientHookCollector`
+- `QQNotificationCollector`
 
-接入要求是把 QQ 侧消息转成 `RawQQMessage` 结构即可，后续链路无需重写。
+这个 collector 的工作方式是：
+
+1. 你先在本机手动登录个人 QQ
+2. 开启 QQ 的桌面消息通知
+3. collector 监听 Linux 桌面通知总线
+4. 只采集你指定的一个或多个群聊
+
+它不依赖官方群机器人，也不要求非官方协议登录。代价是它依赖 QQ 通知格式，并且只能抓到“系统发出的新消息通知”。
+
+启用方式：
+
+```bash
+MESSAGE_SOURCE=qq_notification
+QQ_ALLOWED_GROUPS=清华软院预推免群,北大信息学院套磁群
+QQ_GROUP_FILTER_MODE=exact
+```
+
+如果你的 QQ 通知 `app_name` 不是默认值，可以调整：
+
+```bash
+QQ_NOTIFICATION_APP_NAMES=QQ,linuxqq,com.tencent.qq,com.tencent.mobileqq
+```
+
+使用前提：
+
+- QQ 已登录
+- 群消息通知未被关闭
+- Linux 系统通知正常工作
+- 你要监控的群没有被静音到完全不弹通知
 
 ## LLM 设计
 

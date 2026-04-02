@@ -6,4 +6,4 @@ __pycache__/
 summary_bot.db
 summary_bot_demo.db
 *.log
-
+.env
