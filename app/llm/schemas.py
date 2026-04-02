@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantic import BaseModel
+
 from app.schemas import GroupBrief, HourlySummaryPayload, MessageClassification, SummaryImportantItem
 
 
@@ -18,3 +20,7 @@ class LLMGroupBrief(GroupBrief):
 class LLMHourlySummaryPayload(HourlySummaryPayload):
     pass
 
+
+class LLMHourlySummaryEnvelope(BaseModel):
+    markdown: str
+    summary_json: LLMHourlySummaryPayload

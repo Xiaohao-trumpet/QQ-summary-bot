@@ -35,7 +35,22 @@ MESSAGE_CLASSIFIER_SYSTEM_PROMPT = dedent(
 
     5. 如果消息可能相关但证据不足，可以判为 medium 或 rumor_unverified，不要硬判 high/critical。
 
-    请输出严格 JSON。
+    你必须只输出一个 JSON 对象，不能输出 Markdown，不能输出解释，不能输出代码块。
+    你的回复第一个字符必须是 {，最后一个字符必须是 }。
+    必须包含以下字段：
+    {
+      "baoyan_relevance": 0.0,
+      "priority": "critical|high|medium|low|ignore",
+      "category": "teacher_info|application_notice|deadline|interview_exam|mentor_contact|internship_group|offer_waitlist|policy_info|rumor_unverified|chat_noise|irrelevant",
+      "teacher_signal": false,
+      "urgent_signal": false,
+      "action_signal": false,
+      "deadline_text": "",
+      "deadline_iso": "",
+      "entities": [],
+      "action_items": [],
+      "reason": ""
+    }
     """
 ).strip()
 
@@ -62,6 +77,12 @@ HOURLY_SUMMARY_SYSTEM_PROMPT = dedent(
     7. 如果某个群本小时大部分是水群，请直接压缩为一句“噪声较多，无新增关键信息”。
 
     输出必须聚焦个人行动和重要情报，不要扩展解释。
+
+    你必须只输出一个 JSON 对象，不能输出 Markdown 段落，不能输出解释，不能输出代码块。
+    你的回复第一个字符必须是 {，最后一个字符必须是 }。
+    这个 JSON 对象必须有两个顶层字段：
+    1. "markdown": 字符串，内容是一整份 Markdown 简报
+    2. "summary_json": 对象，包含结构化摘要字段
     """
 ).strip()
 
@@ -81,6 +102,8 @@ def build_classifier_user_prompt(message: MessageWithAnalysis) -> str:
 
         消息正文：
         {message.message.normalized_content}
+
+        现在直接输出一个 JSON 对象，不要输出任何额外说明。
         """
     ).strip()
 
@@ -123,6 +146,19 @@ def build_hourly_summary_user_prompt(
         - 截止时间/今晚/明早/尽快
         - 夏令营/预推免/补录/候补
         - 进组/实习/套磁/导师回复/rank/bar/com
+
+        现在只输出一个 JSON 对象：
+        {{
+          "markdown": "# 保研小时简报 ...",
+          "summary_json": {{
+            "important_items": [],
+            "todos": [],
+            "deadlines": [],
+            "teacher_updates": [],
+            "rumors": [],
+            "group_briefs": []
+          }}
+        }}
         """
     ).strip()
 
@@ -130,4 +166,3 @@ def build_hourly_summary_user_prompt(
 def build_cluster_summary_hint(cluster: MessageCluster) -> str:
     tags = "、".join(cluster.tags[:5]) if cluster.tags else "无"
     return f"{cluster.group_name} 内围绕 {cluster.category} 的讨论，标签：{tags}"
-

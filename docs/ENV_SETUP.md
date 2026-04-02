@@ -125,8 +125,16 @@ ModuleNotFoundError: No module named 'fastapi'
 解决：
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+如果你的环境里设置了类似下面的代理变量：
+
+```bash
+ALL_PROXY=socks5h://127.0.0.1:7890
+```
+
+那就必须确保已经安装 `socksio`。当前 `requirements.txt` 已经包含它。
 
 ### 2. 使用了系统 Python，但没进虚拟环境
 
@@ -155,4 +163,3 @@ pip install -r requirements.txt
 cp .env.example .env
 python scripts/run_demo.py
 ```
-

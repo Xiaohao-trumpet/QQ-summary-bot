@@ -5,7 +5,10 @@ import logging
 from json import JSONDecodeError
 from typing import Any
 
-import httpx
+try:
+    import httpx
+except ModuleNotFoundError:  # pragma: no cover - optional when LLM is disabled
+    httpx = None
 
 
 LOGGER = logging.getLogger(__name__)
@@ -77,21 +80,52 @@ class OpenAICompatClient:
             user_prompt=user_prompt,
             temperature=temperature,
         )
-        if schema is not None:
-            payload["response_format"] = {"type": "json_object"}
+        if schema is None:
+            response_json = await self._request_chat(payload)
+            content = self._extract_content(response_json)
+            parsed = self._extract_json_object(content)
+            return parsed
+
+        tool_payload = dict(payload)
+        tool_payload["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "structured_response",
+                    "description": "Emit a structured JSON response.",
+                    "parameters": schema,
+                },
+            }
+        ]
+        tool_payload["tool_choice"] = "required"
 
         try:
-            response_json = await self._request_chat(payload)
-            content = self._extract_content(response_json)
+            response_json = await self._request_chat(tool_payload)
+            parsed = self._extract_tool_arguments(response_json)
         except httpx.HTTPStatusError as exc:
-            if schema is None or exc.response.status_code != 400:
+            if exc.response.status_code != 400:
                 raise
-            LOGGER.info("response_format unsupported, falling back to text extraction")
-            payload.pop("response_format", None)
-            response_json = await self._request_chat(payload)
-            content = self._extract_content(response_json)
+            LOGGER.info("tool calling unsupported, falling back to json_schema mode")
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "structured_response",
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
+            try:
+                response_json = await self._request_chat(payload)
+                content = self._extract_content(response_json)
+            except httpx.HTTPStatusError as nested_exc:
+                if nested_exc.response.status_code != 400:
+                    raise
+                LOGGER.info("json_schema unsupported, falling back to json_object mode")
+                payload["response_format"] = {"type": "json_object"}
+                response_json = await self._request_chat(payload)
+                content = self._extract_content(response_json)
+            parsed = self._extract_json_object(content)
 
-        parsed = self._extract_json_object(content)
         if schema is not None and not self._basic_schema_validate(parsed, schema):
             raise SchemaValidationError("response does not satisfy schema")
         return parsed
@@ -112,6 +146,8 @@ class OpenAICompatClient:
         }
 
     async def _request_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if httpx is None:
+            raise RuntimeError("httpx is required for LLM requests but is not installed")
         url = f"{self.base_url}/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -161,9 +197,26 @@ class OpenAICompatClient:
             raise
 
     @staticmethod
+    def _extract_tool_arguments(response_json: dict[str, Any]) -> dict[str, Any]:
+        choices = response_json.get("choices") or []
+        if not choices:
+            raise ValueError("missing choices in response")
+        message = choices[0].get("message") or {}
+        tool_calls = message.get("tool_calls") or []
+        if not tool_calls:
+            raise ValueError("missing tool_calls in response")
+        function_payload = tool_calls[0].get("function") or {}
+        arguments = function_payload.get("arguments", "")
+        if not isinstance(arguments, str) or not arguments.strip():
+            raise ValueError("empty tool call arguments")
+        parsed = json.loads(arguments)
+        if not isinstance(parsed, dict):
+            raise ValueError("tool call arguments are not a JSON object")
+        return parsed
+
+    @staticmethod
     def _basic_schema_validate(payload: dict[str, Any], schema: dict[str, Any]) -> bool:
         if schema.get("type") == "object" and not isinstance(payload, dict):
             return False
         required = schema.get("required", [])
         return all(key in payload for key in required)
-

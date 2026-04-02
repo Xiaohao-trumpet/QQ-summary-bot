@@ -8,7 +8,7 @@ from datetime import datetime
 from pydantic import ValidationError
 
 from app.llm.prompts import HOURLY_SUMMARY_SYSTEM_PROMPT, build_hourly_summary_user_prompt
-from app.llm.schemas import LLMHourlySummaryPayload
+from app.llm.schemas import LLMHourlySummaryEnvelope, LLMHourlySummaryPayload
 from app.schemas import GroupBrief, HourlySummaryPayload, HourlySummaryResult, MessageCluster, MessageWithAnalysis, SummaryImportantItem
 
 
@@ -32,6 +32,7 @@ class HourlySummarizer:
     ) -> HourlySummaryResult:
         fallback_payload = self._build_fallback_payload(messages)
         summary_payload = fallback_payload
+        markdown = self._render_markdown(summary_payload, window_start, window_end)
 
         important_messages = [
             {
@@ -70,14 +71,14 @@ class HourlySummarizer:
                         ),
                         group_stats_json=json.dumps(group_stats, ensure_ascii=False, indent=2),
                     ),
-                    schema=LLMHourlySummaryPayload.model_json_schema(),
+                    schema=LLMHourlySummaryEnvelope.model_json_schema(),
                     temperature=self.llm_temperature,
                 )
-                summary_payload = LLMHourlySummaryPayload.model_validate(llm_payload)
+                envelope = LLMHourlySummaryEnvelope.model_validate(llm_payload)
+                summary_payload = envelope.summary_json
+                markdown = envelope.markdown.strip() or markdown
             except (RuntimeError, ValidationError, ValueError) as exc:
                 LOGGER.warning("falling back to deterministic summarizer: %s", exc)
-
-        markdown = self._render_markdown(summary_payload, window_start, window_end)
         return HourlySummaryResult(
             window_start=window_start,
             window_end=window_end,
@@ -240,4 +241,3 @@ class HourlySummarizer:
         else:
             lines.append("- 继续观察，无需立即动作。")
         return "\n".join(lines)
-

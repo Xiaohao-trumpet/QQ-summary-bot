@@ -33,6 +33,18 @@ CATEGORY_PRIORITY_MAP = {
     "rumor_unverified": "rumor_unverified",
 }
 
+CATEGORY_INFERENCE_ORDER = [
+    "interview_exam",
+    "mentor_contact",
+    "offer_waitlist",
+    "deadline",
+    "teacher_info",
+    "application_notice",
+    "internship_group",
+    "policy_info",
+    "rumor_unverified",
+]
+
 ENTITY_PATTERNS = [
     re.compile(r"[\u4e00-\u9fff]{2,20}(大学|学院|实验室|研究院|课题组)"),
     re.compile(r"[\u4e00-\u9fff]{2,8}老师"),
@@ -209,6 +221,9 @@ class MessageClassifier:
 
     @staticmethod
     def _infer_category(topic_tags: list[str]) -> str:
+        for tag in CATEGORY_INFERENCE_ORDER:
+            if tag in topic_tags:
+                return CATEGORY_PRIORITY_MAP[tag]
         for tag in topic_tags:
             if tag in CATEGORY_PRIORITY_MAP:
                 return CATEGORY_PRIORITY_MAP[tag]
@@ -238,4 +253,3 @@ class MessageClassifier:
         if any(title in message.sender_name for title in ["老师", "导师", "教授"]):
             entities.append(message.sender_name)
         return sorted(set(entities))
-

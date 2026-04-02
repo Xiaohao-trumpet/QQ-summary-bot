@@ -1,65 +1,72 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-class Settings(BaseSettings):
-    app_env: str = Field(default="development", alias="APP_ENV")
-    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    database_url: str = Field(default="sqlite:///./summary_bot.db", alias="DATABASE_URL")
-    enable_scheduler: bool = Field(default=False, alias="ENABLE_SCHEDULER")
-    timezone: str = Field(default="Asia/Shanghai", alias="TIMEZONE")
+def _parse_bool(value: str | bool | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
-    message_source: str = Field(default="file", alias="MESSAGE_SOURCE")
-    message_source_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "mock_messages.jsonl",
-        alias="MESSAGE_SOURCE_PATH",
-    )
-    poll_interval_seconds: int = Field(default=60, alias="POLL_INTERVAL_SECONDS")
-    hourly_summary_interval_seconds: int = Field(
-        default=3600,
-        alias="HOURLY_SUMMARY_INTERVAL_SECONDS",
-    )
 
-    alert_channels: str = Field(default="console", alias="ALERT_CHANNELS")
-    keyword_rules_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "keyword_rules.json",
-        alias="KEYWORD_RULES_PATH",
-    )
+def _load_dotenv(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    payload: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        payload[key.strip()] = value.strip().strip('"').strip("'")
+    return payload
 
-    openai_base_url: str = Field(default="", alias="OPENAI_BASE_URL")
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="", alias="OPENAI_MODEL")
-    openai_timeout: float = Field(default=60.0, alias="OPENAI_TIMEOUT")
-    openai_max_retries: int = Field(default=3, alias="OPENAI_MAX_RETRIES")
-    openai_temperature: float = Field(default=0.1, alias="OPENAI_TEMPERATURE")
 
-    classifier_llm_rule_threshold: float = Field(
-        default=2.5,
-        alias="CLASSIFIER_LLM_RULE_THRESHOLD",
-    )
-    classifier_critical_rule_threshold: float = Field(
-        default=8.5,
-        alias="CLASSIFIER_CRITICAL_RULE_THRESHOLD",
-    )
-    classifier_high_rule_threshold: float = Field(
-        default=6.0,
-        alias="CLASSIFIER_HIGH_RULE_THRESHOLD",
-    )
+def _resolve_path(value: str | Path, default: Path) -> Path:
+    if isinstance(value, Path):
+        path = value
+    else:
+        path = Path(value)
+    if not path.is_absolute():
+        return (PROJECT_ROOT / path).resolve()
+    return path
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        populate_by_name=True,
-        extra="ignore",
-    )
+
+class Settings(BaseModel):
+    app_env: str = "development"
+    log_level: str = "INFO"
+    database_url: str = "sqlite:///./summary_bot.db"
+    enable_scheduler: bool = False
+    timezone: str = "Asia/Shanghai"
+
+    message_source: str = "file"
+    message_source_path: Path = PROJECT_ROOT / "data" / "mock_messages.jsonl"
+    poll_interval_seconds: int = 60
+    hourly_summary_interval_seconds: int = 3600
+
+    alert_channels: str = "console"
+    keyword_rules_path: Path = PROJECT_ROOT / "data" / "keyword_rules.json"
+
+    openai_base_url: str = ""
+    openai_api_key: str = ""
+    openai_model: str = ""
+    openai_timeout: float = 60.0
+    openai_max_retries: int = 3
+    openai_temperature: float = 0.1
+
+    classifier_llm_rule_threshold: float = 2.5
+    classifier_critical_rule_threshold: float = 8.5
+    classifier_high_rule_threshold: float = 6.0
 
     @property
     def llm_enabled(self) -> bool:
@@ -70,7 +77,48 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.alert_channels.split(",") if item.strip()]
 
 
+def _build_settings_payload() -> dict[str, Any]:
+    dotenv_values = _load_dotenv(PROJECT_ROOT / ".env")
+    merged = {**dotenv_values, **os.environ}
+    payload: dict[str, Any] = {
+        "app_env": merged.get("APP_ENV", "development"),
+        "log_level": merged.get("LOG_LEVEL", "INFO"),
+        "database_url": merged.get("DATABASE_URL", "sqlite:///./summary_bot.db"),
+        "enable_scheduler": _parse_bool(merged.get("ENABLE_SCHEDULER"), False),
+        "timezone": merged.get("TIMEZONE", "Asia/Shanghai"),
+        "message_source": merged.get("MESSAGE_SOURCE", "file"),
+        "message_source_path": _resolve_path(
+            merged.get("MESSAGE_SOURCE_PATH", "data/mock_messages.jsonl"),
+            PROJECT_ROOT / "data" / "mock_messages.jsonl",
+        ),
+        "poll_interval_seconds": int(merged.get("POLL_INTERVAL_SECONDS", "60")),
+        "hourly_summary_interval_seconds": int(
+            merged.get("HOURLY_SUMMARY_INTERVAL_SECONDS", "3600")
+        ),
+        "alert_channels": merged.get("ALERT_CHANNELS", "console"),
+        "keyword_rules_path": _resolve_path(
+            merged.get("KEYWORD_RULES_PATH", "data/keyword_rules.json"),
+            PROJECT_ROOT / "data" / "keyword_rules.json",
+        ),
+        "openai_base_url": merged.get("OPENAI_BASE_URL", ""),
+        "openai_api_key": merged.get("OPENAI_API_KEY", ""),
+        "openai_model": merged.get("OPENAI_MODEL", ""),
+        "openai_timeout": float(merged.get("OPENAI_TIMEOUT", "60")),
+        "openai_max_retries": int(merged.get("OPENAI_MAX_RETRIES", "3")),
+        "openai_temperature": float(merged.get("OPENAI_TEMPERATURE", "0.1")),
+        "classifier_llm_rule_threshold": float(
+            merged.get("CLASSIFIER_LLM_RULE_THRESHOLD", "2.5")
+        ),
+        "classifier_critical_rule_threshold": float(
+            merged.get("CLASSIFIER_CRITICAL_RULE_THRESHOLD", "8.5")
+        ),
+        "classifier_high_rule_threshold": float(
+            merged.get("CLASSIFIER_HIGH_RULE_THRESHOLD", "6.0")
+        ),
+    }
+    return payload
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()
-
+    return Settings(**_build_settings_payload())
