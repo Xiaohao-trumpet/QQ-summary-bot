@@ -1,0 +1,17 @@
+{
+  "name": "Summary Bot Mobile",
+  "short_name": "SummaryBot",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "background_color": "#f5efe4",
+  "theme_color": "#10323f",
+  "description": "保研消息摘要与告警移动面板",
+  "icons": [
+    {
+      "src": "/mobile/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

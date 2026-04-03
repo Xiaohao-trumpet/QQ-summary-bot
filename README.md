@@ -1,6 +1,10 @@
 # Summary Bot
 
-`summary_bot` 是一个面向保研场景的 QQ 群文本消息监控与摘要 MVP。当前版本专注于把“消息处理链路”跑通，不直接耦合真实 QQ 采集逻辑，而是通过 `collector` 抽象预留接入点。
+`summary_bot` 现在已经扩成跨设备方案：
+
+- `collector-android/` 作为 Android 主采集端
+- `app/` 里的 FastAPI 服务作为 Summary Server
+- `/mobile` 作为手机 PWA 查看端
 
 ## 功能
 
@@ -10,9 +14,11 @@
 - 每小时生成一份保研导向摘要
 - OpenAI 兼容 API Client
 - SQLite 持久化消息、分析、提醒、摘要
-- FastAPI 接口查看消息和报告
+- FastAPI 接口接收 Android collector 上报、查看消息和报告
+- 手机 PWA 页面：最新摘要、告警、待办、搜索、设备状态
+- Android collector skeleton：通知监听、群白名单、队列、上报
 - Mock / 文件回放 collector，便于本地开发
-- 基于 Linux 桌面通知的真实 QQ collector，可按群名白名单采集
+- Linux QQ 通知 collector 仍保留，适合作为桌面补充源
 
 ## 目录
 
@@ -26,6 +32,7 @@ summary_bot/
     services/
     storage/
   data/
+  collector-android/
   scripts/
   tests/
 ```
@@ -33,9 +40,9 @@ summary_bot/
 ## 核心链路
 
 ```text
-collector -> normalizer -> dedup -> rule_engine -> classifier -> alerting
-                                                     -> storage
-storage -> clusterer -> summarizer -> hourly_reports
+android collector -> /api/v1/collector/events -> normalizer -> dedup -> rule_engine
+                                                                -> classifier -> alerting -> storage
+storage -> clusterer -> summarizer -> hourly_reports -> /api/v1/mobile/* -> /mobile PWA
 ```
 
 ## 安装
@@ -67,6 +74,14 @@ OPENAI_MODEL=...
 
 不配置也可以运行，系统会退回规则引擎和确定性摘要。
 
+如果你准备部署“服务器模式”，建议 `.env` 至少设置成：
+
+```bash
+MESSAGE_SOURCE=none
+COLLECTOR_SHARED_TOKEN=change-me
+ENABLE_SCHEDULER=true
+```
+
 ## 运行 Demo
 
 ```bash
@@ -94,10 +109,59 @@ uvicorn app.main:app --reload
 - `GET /messages`
 - `GET /reports`
 - `GET /reports/{report_id}`
+- `POST /api/v1/collector/events`
+- `POST /api/v1/collector/heartbeat`
+- `GET /api/v1/mobile/feed`
+- `GET /api/v1/mobile/alerts`
+- `GET /api/v1/mobile/reports`
+- `GET /api/v1/mobile/search`
+- `GET /mobile`
 
-## 真实 QQ 接入建议
+## Android 主采集端
 
-当前项目已经提供一个真实 collector：
+Android 采集端在 [collector-android/README.md](/home/zhouxiaohao/code_search/projects/summary_bot/collector-android/README.md)。
+
+它的职责是：
+
+1. 读取 QQ 通知
+2. 按群白名单过滤
+3. 本地排队缓存
+4. 上传到服务器
+
+服务器上需要配置：
+
+```bash
+COLLECTOR_SHARED_TOKEN=your-secret-token
+```
+
+Android 应用里需要填写：
+
+- `Server URL`
+- `Collector Token`
+- `Allowed Groups`
+- `Group Filter Mode`
+
+## 手机 PWA
+
+启动服务器后，手机浏览器直接打开：
+
+```text
+https://your-server/mobile
+```
+
+PWA 页面包含：
+
+- 最新小时摘要
+- 高优先级告警
+- 今日待办
+- 设备在线状态
+- 消息搜索
+
+如果浏览器支持，可以直接“添加到主屏幕”。
+
+## 桌面补充 collector
+
+项目仍然保留一个 Linux 侧真实 collector：
 
 - `QQNotificationCollector`
 
@@ -108,7 +172,7 @@ uvicorn app.main:app --reload
 3. collector 监听 Linux 桌面通知总线
 4. 只采集你指定的一个或多个群聊
 
-它不依赖官方群机器人，也不要求非官方协议登录。代价是它依赖 QQ 通知格式，并且只能抓到“系统发出的新消息通知”。
+它适合放在你电脑上作为 Android 采集的补充源，不建议作为第一优先主采集端。
 
 启用方式：
 
@@ -139,8 +203,8 @@ QQ_NOTIFICATION_APP_NAMES=QQ,linuxqq,com.tencent.qq,com.tencent.mobileqq
 
 客户端特性：
 
-- 支持 JSON 输出模式
-- 不支持时退回文本并提取 JSON
+- 优先走 tool calling 做结构化输出
+- tool calling 不支持时再尝试 JSON 输出模式
 - 带重试
 - 顶层 schema 校验
 
@@ -151,10 +215,9 @@ cd /home/zhouxiaohao/code_search/projects/summary_bot
 pytest
 ```
 
-## 后续建议
+## 当前限制
 
-- 增加真实 QQ collector
-- 增加时间解析，把“今晚”“明早”转成绝对时间
-- 增加消息发送人画像，区分老师/管理员/群友
-- 增加多群事件去重
-- 增加 Web 面板或桌面提醒通道
+- Android collector 依赖 QQ 真的发出系统通知
+- Android 项目目前是 skeleton，建议用 Android Studio 打开并在真机上调试
+- PWA 已可用，但 Web Push 还没有接
+- PDF 导出还没做，当前建议用浏览器打印保存

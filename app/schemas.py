@@ -32,6 +32,7 @@ class RawQQMessage(BaseModel):
     content: str
     mentioned_me: bool = False
     message_type: str = "text"
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class NormalizedMessage(RawQQMessage):
@@ -132,3 +133,85 @@ class HourlySummaryResult(BaseModel):
     markdown: str
     summary_json: HourlySummaryPayload
 
+
+class CollectorDeviceInfo(BaseModel):
+    device_id: str
+    device_name: str
+    platform: str
+    app_version: str = ""
+
+
+class CollectorEventPayload(BaseModel):
+    event_id: str
+    source_type: str
+    source_app: str
+    group_name: str
+    sender_name: str
+    content: str
+    timestamp: datetime
+    mentioned_me: bool = False
+    raw_title: str = ""
+    raw_text: str = ""
+    raw_subtext: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CollectorIngestRequest(BaseModel):
+    device: CollectorDeviceInfo
+    events: list[CollectorEventPayload] = Field(default_factory=list)
+
+
+class CollectorIngestResponse(BaseModel):
+    device_id: str
+    accepted_events: int
+    ingested_messages: int
+    duplicate_events: int
+    ignored_events: int
+
+
+class CollectorHeartbeatRequest(BaseModel):
+    device: CollectorDeviceInfo
+
+
+class MobileDeviceStatus(BaseModel):
+    device_id: str
+    device_name: str
+    platform: str
+    app_version: str = ""
+    status: str
+    last_seen_at: str = ""
+    last_event_at: str = ""
+
+
+class MobileAlertItem(BaseModel):
+    alert_id: str
+    message_id: str
+    channel: str
+    status: str
+    sent_at: str
+    payload: str
+
+
+class MobileReportItem(BaseModel):
+    report_id: str
+    window_start: str
+    window_end: str
+    summary_markdown: str
+    summary_json: dict[str, Any]
+    important_count: int
+    critical_count: int
+    created_at: str
+
+
+class MobileFeedResponse(BaseModel):
+    generated_at: str
+    latest_report: MobileReportItem | None = None
+    recent_alerts: list[MobileAlertItem] = Field(default_factory=list)
+    devices: list[MobileDeviceStatus] = Field(default_factory=list)
+    today_todos: list[str] = Field(default_factory=list)
+    group_overview: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SearchResultItem(BaseModel):
+    message: dict[str, Any]
+    analysis: dict[str, Any]

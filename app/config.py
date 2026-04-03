@@ -57,6 +57,8 @@ class Settings(BaseModel):
     qq_group_filter_mode: str = "exact"
     qq_notification_app_names: str = "QQ,linuxqq,com.tencent.qq,com.tencent.mobileqq"
     qq_capture_private_chats: bool = False
+    collector_shared_token: str = ""
+    mobile_title: str = "Summary Bot"
 
     alert_channels: str = "console"
     keyword_rules_path: Path = PROJECT_ROOT / "data" / "keyword_rules.json"
@@ -117,6 +119,8 @@ def _build_settings_payload() -> dict[str, Any]:
             merged.get("QQ_CAPTURE_PRIVATE_CHATS"),
             False,
         ),
+        "collector_shared_token": merged.get("COLLECTOR_SHARED_TOKEN", ""),
+        "mobile_title": merged.get("MOBILE_TITLE", "Summary Bot"),
         "alert_channels": merged.get("ALERT_CHANNELS", "console"),
         "keyword_rules_path": _resolve_path(
             merged.get("KEYWORD_RULES_PATH", "data/keyword_rules.json"),

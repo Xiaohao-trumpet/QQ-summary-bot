@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Iterable
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session
 
 from app.schemas import HourlySummaryResult, MessageAnalysis, MessageWithAnalysis, NormalizedMessage
-from app.storage.models import AlertORM, HourlyReportORM, MessageAnalysisORM, MessageORM
+from app.storage.models import (
+    AlertORM,
+    CollectorEventORM,
+    DeviceORM,
+    HourlyReportORM,
+    MessageAnalysisORM,
+    MessageORM,
+)
 
 
 def _json_dump(value) -> str:
@@ -72,6 +80,81 @@ class BotRepository:
             channel=channel,
             status=status,
             payload=payload,
+        )
+        self.session.add(row)
+
+    def collector_event_exists(self, event_id: str) -> bool:
+        stmt = select(CollectorEventORM.event_id).where(CollectorEventORM.event_id == event_id)
+        return self.session.execute(stmt).scalar_one_or_none() is not None
+
+    def upsert_device(
+        self,
+        device_id: str,
+        device_name: str,
+        platform: str,
+        app_version: str,
+        status: str,
+        seen_at: datetime,
+        event_at: datetime | None = None,
+    ) -> None:
+        existing = self.session.get(DeviceORM, device_id)
+        if existing is None:
+            existing = DeviceORM(
+                device_id=device_id,
+                device_name=device_name,
+                platform=platform,
+                app_version=app_version,
+                status=status,
+                last_seen_at=seen_at,
+                last_event_at=event_at,
+                created_at=seen_at,
+                updated_at=seen_at,
+            )
+            self.session.add(existing)
+            return
+        existing.device_name = device_name
+        existing.platform = platform
+        existing.app_version = app_version
+        existing.status = status
+        existing.last_seen_at = seen_at
+        if event_at is not None:
+            existing.last_event_at = event_at
+        existing.updated_at = seen_at
+
+    def save_collector_event(
+        self,
+        event_id: str,
+        device_id: str,
+        source_type: str,
+        source_app: str,
+        group_name: str,
+        sender_name: str,
+        content: str,
+        timestamp: datetime,
+        raw_title: str,
+        raw_text: str,
+        raw_subtext: str,
+        mentioned_me: bool,
+        metadata: dict,
+        message_id: str,
+        status: str,
+    ) -> None:
+        row = CollectorEventORM(
+            event_id=event_id,
+            device_id=device_id,
+            source_type=source_type,
+            source_app=source_app,
+            group_name=group_name,
+            sender_name=sender_name,
+            content=content,
+            timestamp=timestamp,
+            raw_title=raw_title,
+            raw_text=raw_text,
+            raw_subtext=raw_subtext,
+            mentioned_me=mentioned_me,
+            metadata_json=_json_dump(metadata),
+            message_id=message_id,
+            status=status,
         )
         self.session.add(row)
 
@@ -143,9 +226,54 @@ class BotRepository:
         stmt = select(HourlyReportORM).order_by(HourlyReportORM.window_end.desc()).limit(limit)
         return list(self.session.scalars(stmt).all())
 
+    def get_latest_report(self) -> HourlyReportORM | None:
+        stmt = select(HourlyReportORM).order_by(HourlyReportORM.window_end.desc()).limit(1)
+        return self.session.execute(stmt).scalar_one_or_none()
+
     def get_report(self, report_id: str) -> HourlyReportORM | None:
         stmt = select(HourlyReportORM).where(HourlyReportORM.report_id == report_id)
         return self.session.execute(stmt).scalar_one_or_none()
+
+    def list_recent_alerts(self, limit: int = 20) -> list[AlertORM]:
+        stmt = select(AlertORM).order_by(AlertORM.sent_at.desc()).limit(limit)
+        return list(self.session.scalars(stmt).all())
+
+    def list_devices(self) -> list[DeviceORM]:
+        stmt = select(DeviceORM).order_by(DeviceORM.last_seen_at.desc())
+        return list(self.session.scalars(stmt).all())
+
+    def search_message_views(
+        self,
+        query: str,
+        group_name: str | None = None,
+        limit: int = 50,
+    ) -> list[MessageWithAnalysis]:
+        stmt: Select = (
+            select(MessageORM, MessageAnalysisORM)
+            .join(MessageAnalysisORM, MessageORM.id == MessageAnalysisORM.message_id, isouter=True)
+            .where(
+                or_(
+                    MessageORM.normalized_content.contains(query),
+                    MessageORM.group_name.contains(query),
+                    MessageORM.sender_name.contains(query),
+                )
+            )
+            .order_by(MessageORM.timestamp.desc())
+            .limit(limit)
+        )
+        if group_name:
+            stmt = stmt.where(MessageORM.group_name == group_name)
+        results: list[MessageWithAnalysis] = []
+        for message_row, analysis_row in self.session.execute(stmt).all():
+            if analysis_row is None:
+                continue
+            results.append(
+                MessageWithAnalysis(
+                    message=self._to_message(message_row),
+                    analysis=self._to_analysis(analysis_row),
+                )
+            )
+        return results
 
     @staticmethod
     def _to_message(row: MessageORM) -> NormalizedMessage:
@@ -198,6 +326,53 @@ class BotRepository:
                     "important_count": row.important_count,
                     "critical_count": row.critical_count,
                     "created_at": row.created_at.isoformat(),
+                }
+            )
+        return payload
+
+    @staticmethod
+    def serialize_report(row: HourlyReportORM) -> dict:
+        return {
+            "report_id": row.report_id,
+            "window_start": row.window_start.isoformat(),
+            "window_end": row.window_end.isoformat(),
+            "summary_markdown": row.summary_markdown,
+            "summary_json": json.loads(row.summary_json),
+            "important_count": row.important_count,
+            "critical_count": row.critical_count,
+            "created_at": row.created_at.isoformat(),
+        }
+
+    @staticmethod
+    def serialize_alert_rows(rows: Iterable[AlertORM]) -> list[dict]:
+        return [
+            {
+                "alert_id": row.alert_id,
+                "message_id": row.message_id,
+                "channel": row.channel,
+                "status": row.status,
+                "sent_at": row.sent_at.isoformat(),
+                "payload": row.payload,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    def serialize_device_rows(rows: Iterable[DeviceORM], stale_after_seconds: int = 600) -> list[dict]:
+        now = datetime.utcnow()
+        payload: list[dict] = []
+        for row in rows:
+            last_seen = row.last_seen_at
+            active = (now - last_seen).total_seconds() <= stale_after_seconds if last_seen else False
+            payload.append(
+                {
+                    "device_id": row.device_id,
+                    "device_name": row.device_name,
+                    "platform": row.platform,
+                    "app_version": row.app_version,
+                    "status": "online" if active else row.status,
+                    "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else "",
+                    "last_event_at": row.last_event_at.isoformat() if row.last_event_at else "",
                 }
             )
         return payload

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#10323f" />
+    <title>Summary Bot Mobile</title>
+    <link rel="manifest" href="/mobile/manifest.webmanifest" />
+    <link rel="icon" href="/mobile/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/mobile-assets/mobile.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Summary Bot</p>
+          <h1>保研消息移动面板</h1>
+          <p class="subtle">最新摘要、关键告警、今日待办和设备在线状态。</p>
+        </div>
+        <button id="refreshButton" class="primary-button">刷新</button>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>最新小时简报</h2>
+          <span id="generatedAt" class="meta"></span>
+        </div>
+        <article id="latestReport" class="report-card empty-state">正在加载...</article>
+      </section>
+
+      <section class="panel grid-two">
+        <article class="subpanel">
+          <div class="panel-header">
+            <h2>高优先级告警</h2>
+          </div>
+          <div id="alertsList" class="list"></div>
+        </article>
+        <article class="subpanel">
+          <div class="panel-header">
+            <h2>今日待办</h2>
+          </div>
+          <ul id="todosList" class="todo-list"></ul>
+        </article>
+      </section>
+
+      <section class="panel grid-two">
+        <article class="subpanel">
+          <div class="panel-header">
+            <h2>设备状态</h2>
+          </div>
+          <div id="devicesList" class="list"></div>
+        </article>
+        <article class="subpanel">
+          <div class="panel-header">
+            <h2>群动态速览</h2>
+          </div>
+          <div id="groupsList" class="list"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>消息搜索</h2>
+        </div>
+        <form id="searchForm" class="search-bar">
+          <input id="searchInput" type="search" placeholder="搜索老师、学校、面试、套磁..." />
+          <button type="submit" class="primary-button">搜索</button>
+        </form>
+        <div id="searchResults" class="list"></div>
+      </section>
+    </main>
+    <script src="/mobile-assets/mobile.js" defer></script>
+  </body>
+</html>

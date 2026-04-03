@@ -50,8 +50,8 @@ cp .env.example .env
 
 ```bash
 DATABASE_URL=sqlite:///./summary_bot.db
-MESSAGE_SOURCE=file
-MESSAGE_SOURCE_PATH=./data/mock_messages.jsonl
+MESSAGE_SOURCE=none
+COLLECTOR_SHARED_TOKEN=change-me
 ALERT_CHANNELS=console
 ```
 
@@ -123,6 +123,41 @@ uvicorn app.main:app --reload
 - `GET /health`
 - `GET /messages`
 - `GET /reports`
+- `POST /api/v1/collector/events`
+- `GET /api/v1/mobile/feed`
+- `GET /mobile`
+
+## 7.1 启动手机 PWA
+
+服务器起来之后，手机浏览器访问：
+
+```text
+https://your-server/mobile
+```
+
+如果你使用的是本地调试，也可以先在电脑浏览器打开：
+
+```text
+http://127.0.0.1:8000/mobile
+```
+
+## 7.2 Android Collector
+
+Android 主采集端代码在：
+
+[collector-android/README.md](/home/zhouxiaohao/code_search/projects/summary_bot/collector-android/README.md)
+
+你需要在 Android Studio 中：
+
+1. 打开 `collector-android`
+2. 安装到安卓手机
+3. 授予通知读取权限
+4. 在 App 中填写：
+   - Server URL
+   - Collector Token
+   - Allowed Groups
+   - Filter Mode
+5. 确保手机 QQ 已登录，且目标群会弹系统通知
 
 ## 8. 跑测试
 
@@ -177,7 +212,7 @@ which pip
 
 ## 10. 建议的安装顺序
 
-最稳妥的一套命令是：
+最稳妥的一套服务器启动命令是：
 
 ```bash
 cd /home/zhouxiaohao/code_search/projects/summary_bot
@@ -185,5 +220,5 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python scripts/run_demo.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Summary Bot Collector</string>
+    <string name="service_name">QQ Notification Collector</string>
+    <string name="collector_hint">监听 QQ 通知并上传到 Summary Server。先手动登录 QQ，再给本应用通知读取权限。</string>
+    <string name="device_id_label">Device ID</string>
+    <string name="device_name_hint">设备名，例如 Xiaohao Pixel</string>
+    <string name="server_url_hint">Server URL，例如 https://summary.example.com</string>
+    <string name="token_hint">Collector Token</string>
+    <string name="allowed_groups_hint">允许采集的群名，逗号分隔</string>
+    <string name="filter_exact">群名精确匹配</string>
+    <string name="filter_contains">群名包含匹配</string>
+    <string name="open_notification_access">打开通知读取权限</string>
+    <string name="save_config">保存配置</string>
+    <string name="sync_now">立即同步</string>
+    <string name="status_label">状态</string>
+    <string name="status_not_granted">等待授予通知权限</string>
+    <string name="status_saved">配置已保存</string>
+    <string name="status_sync_requested">已请求立即同步</string>
+</resources>

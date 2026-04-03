@@ -55,6 +55,5 @@ class MessageNormalizer:
             mentioned_me=raw_message.mentioned_me,
             is_text=True,
             dedup_hash=dedup_hash,
-            metadata={},
+            metadata=dict(raw_message.metadata),
         )
-

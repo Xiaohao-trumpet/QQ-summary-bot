@@ -4,9 +4,12 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
+from app.api.routes_collector import router as collector_router
 from app.api.routes_health import router as health_router
 from app.api.routes_messages import router as messages_router
+from app.api.routes_mobile import router as mobile_router
 from app.api.routes_reports import router as reports_router
 from app.collector.file_replay_collector import FileReplayCollector
 from app.collector.mock_collector import MockCollector
@@ -21,9 +24,12 @@ from app.pipeline.rule_engine import RuleEngine
 from app.pipeline.summarizer import HourlySummarizer
 from app.scheduler import BotScheduler
 from app.services.analysis_service import AnalysisService
+from app.services.collector_service import CollectorService
 from app.services.ingest_service import IngestService
+from app.services.mobile_service import MobileService
 from app.services.report_service import ReportService
 from app.storage.db import Database
+from app.config import PROJECT_ROOT
 
 
 def configure_logging(level: str) -> None:
@@ -95,6 +101,8 @@ async def lifespan(app: FastAPI):
         analysis_service=analysis_service,
         alert_manager=alert_manager,
     )
+    collector_service = CollectorService(database=database, ingest_service=ingest_service)
+    mobile_service = MobileService(database=database)
 
     scheduler = BotScheduler(
         settings=settings,
@@ -107,6 +115,8 @@ async def lifespan(app: FastAPI):
     app.state.database = database
     app.state.collector = collector
     app.state.ingest_service = ingest_service
+    app.state.collector_service = collector_service
+    app.state.mobile_service = mobile_service
     app.state.report_service = report_service
     app.state.scheduler = scheduler
 
@@ -127,6 +137,13 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(messages_router)
     app.include_router(reports_router)
+    app.include_router(collector_router)
+    app.include_router(mobile_router)
+    app.mount(
+        "/mobile-assets",
+        StaticFiles(directory=PROJECT_ROOT / "app" / "ui" / "static"),
+        name="mobile-assets",
+    )
     return app
 
 

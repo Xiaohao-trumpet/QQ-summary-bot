@@ -73,3 +73,37 @@ class AlertORM(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     payload: Mapped[str] = mapped_column(Text)
 
+
+class DeviceORM(Base):
+    __tablename__ = "devices"
+
+    device_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    device_name: Mapped[str] = mapped_column(Text, index=True)
+    platform: Mapped[str] = mapped_column(Text, index=True)
+    app_version: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(Text, default="unknown")
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    last_event_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CollectorEventORM(Base):
+    __tablename__ = "collector_events"
+
+    event_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    device_id: Mapped[str] = mapped_column(Text, index=True)
+    source_type: Mapped[str] = mapped_column(Text, index=True)
+    source_app: Mapped[str] = mapped_column(Text, default="")
+    group_name: Mapped[str] = mapped_column(Text, index=True)
+    sender_name: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    timestamp: Mapped[datetime] = mapped_column(DateTime, index=True)
+    raw_title: Mapped[str] = mapped_column(Text, default="")
+    raw_text: Mapped[str] = mapped_column(Text, default="")
+    raw_subtext: Mapped[str] = mapped_column(Text, default="")
+    mentioned_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    message_id: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(Text, default="received", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
